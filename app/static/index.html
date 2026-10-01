@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookSafe — Room Booking</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#fff; --ink:#1b1f24; --muted:#6b7280;
+    --line:#e3e6ea; --brand:#2f5fe0; --brand-dark:#2749ad;
+    --ok:#0f7b47; --ok-bg:#e7f6ee; --bad:#b3261e; --bad-bg:#fdeceb;
+    --shadow:rgba(0,0,0,.07); --shadow-lg:rgba(0,0,0,.06);
+    --radius:10px;
+  }
+  /* Follow the operating system unless the person has chosen for themselves. */
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14171c; --card:#1b1f26; --ink:#e6e9ee; --muted:#98a1af;
+      --line:#2b313a; --brand:#5b8cff; --brand-dark:#4a76e0;
+      --ok:#5cd6a0; --ok-bg:#16332a; --bad:#ff8a80; --bad-bg:#3a1f1f;
+      --shadow:rgba(0,0,0,.5); --shadow-lg:rgba(0,0,0,.45);
+    }
+  }
+  /* An explicit choice always wins, in both directions. */
+  :root[data-theme="dark"]{
+    --bg:#14171c; --card:#1b1f26; --ink:#e6e9ee; --muted:#98a1af;
+    --line:#2b313a; --brand:#5b8cff; --brand-dark:#4a76e0;
+    --ok:#5cd6a0; --ok-bg:#16332a; --bad:#ff8a80; --bad-bg:#3a1f1f;
+    --shadow:rgba(0,0,0,.5); --shadow-lg:rgba(0,0,0,.45);
+  }
+  html{color-scheme:light dark}
+  :root[data-theme="light"]{color-scheme:light}
+  :root[data-theme="dark"]{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  button{font:inherit; cursor:pointer; border:0; border-radius:8px}
+  input,select{
+    font:inherit; width:100%; padding:.6rem .7rem; border:1px solid var(--line);
+    border-radius:8px; background:var(--card); color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--brand); outline-offset:-1px}
+  label{display:block; font-size:.8rem; font-weight:600; color:var(--muted);
+        margin:0 0 .3rem; text-transform:uppercase; letter-spacing:.03em}
+  .field{margin-bottom:.9rem}
+  .btn{background:var(--brand); color:#fff; padding:.65rem 1.1rem; font-weight:600}
+  .btn:hover{background:var(--brand-dark)}
+  .btn:disabled{opacity:.55; cursor:not-allowed}
+  .btn-ghost{background:transparent; color:var(--muted); padding:.4rem .6rem}
+  .btn-ghost:hover{color:var(--ink)}
+  .btn-small{padding:.4rem .8rem; font-size:.85rem}
+  .btn-danger{background:transparent; color:var(--bad); border:1px solid var(--line)}
+  .btn-danger:hover{background:var(--bad-bg)}
+  .msg{padding:.6rem .8rem; border-radius:8px; font-size:.9rem; margin-bottom:.9rem}
+  .msg.bad{background:var(--bad-bg); color:var(--bad)}
+  .msg.ok{background:var(--ok-bg); color:var(--ok)}
+  .hidden{display:none !important}
+
+  /* ---------- login ---------- */
+  #login-screen{min-height:100vh; display:grid; place-items:center; padding:1.5rem}
+  .login-card{
+    width:100%; max-width:390px; background:var(--card); padding:2rem;
+    border-radius:14px; box-shadow:0 1px 3px var(--shadow),0 12px 32px var(--shadow-lg);
+  }
+  .brand{text-align:center; margin-bottom:1.6rem}
+  .brand h1{margin:0; font-size:1.5rem; letter-spacing:-.02em}
+  .brand p{margin:.3rem 0 0; color:var(--muted); font-size:.88rem}
+  .tabs{display:flex; gap:.25rem; background:var(--bg); padding:.25rem;
+        border-radius:9px; margin-bottom:1.3rem}
+  .tabs button{flex:1; padding:.5rem; background:transparent; color:var(--muted);
+               font-weight:600; font-size:.9rem}
+  .tabs button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 2px var(--shadow)}
+  .hint{font-size:.78rem; color:var(--muted); margin-top:.35rem}
+
+  /* ---------- app ---------- */
+  header{
+    background:var(--card); border-bottom:1px solid var(--line);
+    padding:.85rem 1.25rem; display:flex; align-items:center; gap:1rem;
+    position:sticky; top:0; z-index:5;
+  }
+  header .name{font-weight:700; letter-spacing:-.01em}
+  header .who{margin-left:auto; color:var(--muted); font-size:.88rem;
+              display:flex; align-items:center; gap:.6rem}
+  .pill{background:var(--bg); border:1px solid var(--line); border-radius:99px;
+        padding:.12rem .6rem; font-size:.72rem; font-weight:700;
+        text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  main{max-width:900px; margin:0 auto; padding:1.5rem 1.25rem 4rem}
+  .card{background:var(--card); border:1px solid var(--line);
+        border-radius:var(--radius); padding:1.25rem; margin-bottom:1.25rem}
+  .card h2{margin:0 0 1rem; font-size:1.05rem; letter-spacing:-.01em}
+  .row{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.8rem}
+  .room{
+    display:flex; align-items:center; gap:.9rem; padding:.8rem;
+    border:1px solid var(--line); border-radius:9px; margin-bottom:.55rem;
+  }
+  .room .code{font-weight:700; font-size:1.05rem; min-width:3.6rem}
+  .room .meta{color:var(--muted); font-size:.85rem}
+  .room button{margin-left:auto}
+  .booking{
+    display:flex; align-items:center; gap:.9rem; padding:.8rem;
+    border:1px solid var(--line); border-radius:9px; margin-bottom:.55rem;
+  }
+  .booking .when{font-size:.88rem}
+  .booking .purpose{color:var(--muted); font-size:.85rem}
+  .booking button{margin-left:auto}
+  .empty{color:var(--muted); font-size:.9rem; padding:.4rem 0}
+  .theme-btn{
+    background:transparent; border:1px solid var(--line); color:var(--muted);
+    width:34px; height:34px; display:grid; place-items:center; font-size:1rem;
+    border-radius:8px; line-height:1;
+  }
+  .theme-btn:hover{color:var(--ink); border-color:var(--muted)}
+  #login-screen .theme-btn{position:fixed; top:1rem; right:1rem}
+
+  /* ---------- chat ---------- */
+  #chat-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.4); display:grid;
+    place-items:center; z-index:20; padding:1rem;
+  }
+  #chat-panel{
+    width:100%; max-width:420px; max-height:80vh; background:var(--card);
+    border-radius:14px; display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 12px 32px var(--shadow-lg);
+  }
+  #chat-panel header{position:static}
+  #chat-log{flex:1; overflow-y:auto; padding:1rem; display:flex; flex-direction:column; gap:.5rem}
+  .chat-msg{max-width:80%; padding:.5rem .7rem; border-radius:10px; font-size:.88rem;
+            background:var(--bg); word-wrap:break-word}
+  .chat-msg.mine{align-self:flex-end; background:var(--brand); color:#fff}
+  .chat-msg .who{font-size:.72rem; opacity:.7; margin-bottom:.15rem}
+  #chat-form{display:flex; gap:.5rem; padding:.8rem; border-top:1px solid var(--line)}
+  #chat-form input{flex:1}
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN ==================== -->
+<div id="login-screen">
+  <button class="theme-btn" onclick="toggleTheme()" title="Light / dark"
+          aria-label="Switch between light and dark"><span id="theme-icon-1">◐</span></button>
+  <div class="login-card">
+    <div class="brand">
+      <h1>BookSafe</h1>
+      <p>Room booking for Block H</p>
+    </div>
+
+    <div class="tabs">
+      <button id="tab-login" class="on" onclick="switchTab('login')">Log in</button>
+      <button id="tab-signup" onclick="switchTab('signup')">Sign up</button>
+    </div>
+
+    <div id="auth-msg"></div>
+
+    <form id="login-form" onsubmit="doLogin(event)">
+      <div class="field">
+        <label for="li-user">Username</label>
+        <input id="li-user" autocomplete="username" placeholder="your username"
+               autocapitalize="none" spellcheck="false" required>
+      </div>
+      <div class="field">
+        <label for="li-pass">Password</label>
+        <input id="li-pass" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" style="width:100%" type="submit">Log in</button>
+    </form>
+
+    <form id="signup-form" class="hidden" onsubmit="doSignup(event)">
+      <div class="field">
+        <label for="su-name">Full name</label>
+        <input id="su-name" required>
+      </div>
+      <div class="field">
+        <label for="su-user">Username</label>
+        <input id="su-user" autocomplete="username" placeholder="pick a username"
+               autocapitalize="none" spellcheck="false" required>
+        <div class="hint">Letters, numbers, dot, underscore or hyphen.</div>
+      </div>
+      <div class="field">
+        <label for="su-pass">Password</label>
+        <input id="su-pass" type="password" autocomplete="new-password" required>
+        <div class="hint">At least 8 characters.</div>
+      </div>
+      <button class="btn" style="width:100%" type="submit">Create account</button>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== BOOKING ==================== -->
+<div id="app-screen" class="hidden">
+  <header>
+    <span class="name">BookSafe</span>
+    <span class="who">
+      <span id="me-name"></span>
+      <span class="pill" id="me-role"></span>
+      <button class="theme-btn" onclick="toggleTheme()" title="Light / dark"
+              aria-label="Switch between light and dark"><span id="theme-icon-2">◐</span></button>
+      <button class="btn-ghost" onclick="logout()">Log out</button>
+    </span>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Find a room</h2>
+      <div class="row">
+        <div><label for="f-date">Date</label><input id="f-date" type="date"></div>
+        <div><label for="f-start">From</label><input id="f-start" type="time" value="14:00" step="900"></div>
+        <div><label for="f-end">Until</label><input id="f-end" type="time" value="16:00" step="900"></div>
+        <div><label for="f-size">People</label><input id="f-size" type="number" min="1" value="20"></div>
+        <div style="grid-column:1/-1"><label for="f-purpose">What for?</label>
+          <input id="f-purpose" placeholder="Club meeting, lab session, rehearsal…"></div>
+      </div>
+      <div style="margin-top:1rem">
+        <button class="btn" onclick="findRooms()">Search</button>
+        <span class="hint" style="margin-left:.6rem">Up to 7 days ahead, max 24 hours.</span>
+      </div>
+    </div>
+
+    <div class="card" id="results-card">
+      <h2>Available rooms</h2>
+      <div id="search-msg"></div>
+      <div id="results"><div class="empty">Choose a time and press Search.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>My bookings</h2>
+      <div id="mine-msg"></div>
+      <div id="mine"><div class="empty">Nothing booked yet.</div></div>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== CHAT ==================== -->
+<div id="chat-overlay" class="hidden">
+  <div id="chat-panel">
+    <header>
+      <span class="name" id="chat-title">Chat</span>
+      <button class="btn-ghost" style="margin-left:auto" onclick="closeChat()">Close</button>
+    </header>
+    <div id="chat-log"></div>
+    <form id="chat-form" onsubmit="sendChat(event)">
+      <input id="chat-input" placeholder="Message…" maxlength="2000" autocomplete="off">
+      <button class="btn btn-small" type="submit">Send</button>
+    </form>
+  </div>
+</div>
+
+<script>
+let TOKEN = localStorage.getItem("booksafe_token");
+let LAST_SEARCH = null;
+let CURRENT_USER_ID = null;
+
+// ---------------------------------------------------------------- theme
+// No stored choice means "follow the operating system", which the CSS does on
+// its own. Once someone picks, that choice wins everywhere and is remembered.
+function applyTheme(theme) {
+  if (theme) document.documentElement.setAttribute("data-theme", theme);
+  else document.documentElement.removeAttribute("data-theme");
+  const dark = theme
+    ? theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  const icon = dark ? "☀" : "☾";
+  ["theme-icon-1", "theme-icon-2"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = icon;
+  });
+}
+
+function toggleTheme() {
+  const now = document.documentElement.getAttribute("data-theme")
+    || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = now === "dark" ? "light" : "dark";
+  localStorage.setItem("booksafe_theme", next);
+  applyTheme(next);
+}
+
+applyTheme(localStorage.getItem("booksafe_theme"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (!localStorage.getItem("booksafe_theme")) applyTheme(null);
+});
+
+// ---------------------------------------------------------------- helpers
+async function api(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+  const reply = await fetch(path, { ...options, headers });
+  if (reply.status === 204) return null;
+  const body = await reply.json().catch(() => ({}));
+  if (!reply.ok) {
+    if (reply.status === 401 && TOKEN) { logout(); }
+    throw new Error(body.detail || `Something went wrong (${reply.status})`);
+  }
+  return body;
+}
+
+// escape anything user-typed (purpose, chat text) before it goes into innerHTML
+function esc(str) {
+  const div = document.createElement("div");
+  div.textContent = str ?? "";
+  return div.innerHTML;
+}
+
+function note(where, text, kind = "bad") {
+  document.getElementById(where).innerHTML =
+    text ? `<div class="msg ${kind}">${text}</div>` : "";
+}
+
+function when(startISO, endISO) {
+  const s = new Date(startISO), e = new Date(endISO);
+  const day = s.toLocaleDateString(undefined,
+    { weekday: "short", day: "numeric", month: "short" });
+  const t = d => d.toLocaleTimeString(undefined,
+    { hour: "2-digit", minute: "2-digit" });
+  return `${day}, ${t(s)} – ${t(e)}`;
+}
+
+// ---------------------------------------------------------------- login
+function switchTab(which) {
+  const isLogin = which === "login";
+  document.getElementById("tab-login").classList.toggle("on", isLogin);
+  document.getElementById("tab-signup").classList.toggle("on", !isLogin);
+  document.getElementById("login-form").classList.toggle("hidden", !isLogin);
+  document.getElementById("signup-form").classList.toggle("hidden", isLogin);
+  note("auth-msg", "");
+}
+
+async function doLogin(event) {
+  event.preventDefault();
+  note("auth-msg", "");
+  try {
+    const result = await api("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username: document.getElementById("li-user").value.trim(),
+        password: document.getElementById("li-pass").value,
+      }),
+    });
+    signedIn(result.access_token);
+  } catch (err) { note("auth-msg", err.message); }
+}
+
+async function doSignup(event) {
+  event.preventDefault();
+  note("auth-msg", "");
+  try {
+    const result = await api("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({
+        full_name: document.getElementById("su-name").value.trim(),
+        username: document.getElementById("su-user").value.trim(),
+        password: document.getElementById("su-pass").value,
+      }),
+    });
+    signedIn(result.access_token);
+  } catch (err) { note("auth-msg", err.message); }
+}
+
+function signedIn(token) {
+  TOKEN = token;
+  localStorage.setItem("booksafe_token", token);
+  start();
+}
+
+function logout() {
+  TOKEN = null;
+  localStorage.removeItem("booksafe_token");
+  document.getElementById("app-screen").classList.add("hidden");
+  document.getElementById("login-screen").classList.remove("hidden");
+  document.getElementById("li-pass").value = "";
+}
+
+// ---------------------------------------------------------------- booking
+function chosenTimes() {
+  const date = document.getElementById("f-date").value;
+  const from = document.getElementById("f-start").value;
+  const until = document.getElementById("f-end").value;
+  if (!date || !from || !until) throw new Error("Pick a date and a time range.");
+  const starts = new Date(`${date}T${from}`);
+  const ends = new Date(`${date}T${until}`);
+  if (ends <= starts) throw new Error("The end time must be after the start time.");
+  return { starts_at: starts.toISOString(), ends_at: ends.toISOString() };
+}
+
+async function findRooms() {
+  note("search-msg", "");
+  const box = document.getElementById("results");
+  try {
+    const times = chosenTimes();
+    const size = Number(document.getElementById("f-size").value) || 1;
+    LAST_SEARCH = { ...times, party_size: size };
+
+    box.innerHTML = `<div class="empty">Searching…</div>`;
+    const rooms = await api(`/availability?starts_at=${encodeURIComponent(times.starts_at)}`
+      + `&ends_at=${encodeURIComponent(times.ends_at)}&min_capacity=${size}`);
+
+    if (!rooms.length) {
+      box.innerHTML = `<div class="empty">No room that size is free then. `
+        + `Try another time, or a smaller group.</div>`;
+      return;
+    }
+    box.innerHTML = rooms.map(r => `
+      <div class="room">
+        <span class="code">${r.code}</span>
+        <span class="meta">Floor ${r.floor} · seats ${r.capacity}</span>
+        <button class="btn btn-small" onclick="book(${r.id}, '${r.code}', this)">Book</button>
+      </div>`).join("");
+  } catch (err) {
+    box.innerHTML = `<div class="empty">Choose a time and press Search.</div>`;
+    note("search-msg", err.message);
+  }
+}
+
+async function book(roomId, code, button) {
+  note("search-msg", "");
+  const purpose = document.getElementById("f-purpose").value.trim() || "Booking";
+  button.disabled = true;
+  button.textContent = "Booking…";
+  try {
+    await api("/bookings", {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ room_id: roomId, ...LAST_SEARCH, purpose }),
+    });
+    // refresh FIRST — findRooms() clears this box, so the confirmation
+    // has to be written after it, or it flashes and vanishes.
+    await Promise.all([findRooms(), loadMine()]);
+    note("search-msg", `${code} is booked. It's in your list below.`, "ok");
+  } catch (err) {
+    note("search-msg", err.message);
+    button.disabled = false;
+    button.textContent = "Book";
+  }
+}
+
+async function loadMine() {
+  const box = document.getElementById("mine");
+  try {
+    const mine = await api("/me/bookings");
+    box.innerHTML = mine.length ? mine.map(b => `
+      <div class="booking">
+        <span class="code" style="font-weight:700">${esc(b.room)}</span>
+        <span>
+          <div class="when">${when(b.starts_at, b.ends_at)}</div>
+          <div class="purpose">${esc(b.purpose) || "—"}</div>
+        </span>
+        <button class="btn-small btn-ghost" onclick="openChat(${b.id}, '${esc(b.room)}')">Chat</button>
+        <button class="btn-small btn-danger" onclick="cancel(${b.id}, this)">Cancel</button>
+      </div>`).join("")
+      : `<div class="empty">Nothing booked yet.</div>`;
+  } catch (err) { note("mine-msg", err.message); }
+}
+
+async function cancel(id, button) {
+  note("mine-msg", "");
+  button.disabled = true;
+  button.textContent = "…";
+  try {
+    await api(`/bookings/${id}`, { method: "DELETE" });
+    await Promise.all([loadMine(), LAST_SEARCH ? findRooms() : null]);
+  } catch (err) {
+    note("mine-msg", err.message);
+    button.disabled = false;
+    button.textContent = "Cancel";
+  }
+}
+
+// ---------------------------------------------------------------- chat
+let CHAT_SOCKET = null;
+
+function openChat(bookingId, roomCode) {
+  document.getElementById("chat-title").textContent = `Chat — ${roomCode}`;
+  document.getElementById("chat-log").innerHTML = "";
+  document.getElementById("chat-overlay").classList.remove("hidden");
+
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  // token goes as a websocket subprotocol, not a query string, so it
+  // doesn't end up in server logs or browser history
+  CHAT_SOCKET = new WebSocket(
+    `${proto}://${location.host}/ws/bookings/${bookingId}`, [TOKEN]);
+
+  CHAT_SOCKET.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.error) { addChatLine(msg.error, false, true); return; }
+    addChatLine(msg.body, msg.sender_id === CURRENT_USER_ID);
+  };
+  CHAT_SOCKET.onclose = (event) => {
+    if (event.code === 4401 || event.code === 4403) {
+      addChatLine("You don't have access to this conversation.", false, true);
+    }
+  };
+}
+
+function addChatLine(text, mine, isError = false) {
+  const log = document.getElementById("chat-log");
+  const div = document.createElement("div");
+  div.className = "chat-msg" + (mine ? " mine" : "");
+  div.style.color = isError ? "var(--bad)" : "";
+  div.textContent = text;  // never innerHTML here, chat text isn't trusted
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function closeChat() {
+  document.getElementById("chat-overlay").classList.add("hidden");
+  if (CHAT_SOCKET) { CHAT_SOCKET.close(); CHAT_SOCKET = null; }
+}
+
+function sendChat(event) {
+  event.preventDefault();
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text || !CHAT_SOCKET || CHAT_SOCKET.readyState !== WebSocket.OPEN) return;
+  CHAT_SOCKET.send(text);
+  input.value = "";
+}
+
+// ---------------------------------------------------------------- startup
+async function start() {
+  try {
+    const me = await api("/auth/me");
+    CURRENT_USER_ID = me.id;
+    document.getElementById("me-name").textContent = me.username;
+    document.getElementById("me-role").textContent = me.role;
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("app-screen").classList.remove("hidden");
+
+    const today = new Date();
+    const iso = d => d.toISOString().slice(0, 10);
+    const date = document.getElementById("f-date");
+    date.value = iso(new Date(today.getTime() + 864e5));
+    date.min = iso(today);
+    date.max = iso(new Date(today.getTime() + 7 * 864e5));
+
+    loadMine();
+  } catch (err) {
+    logout();
+  }
+}
+
+if (TOKEN) start();
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16
+    container_name: booksafe-db
+    environment:
+      POSTGRES_USER: booksafe
+      POSTGRES_PASSWORD: booksafe
+      POSTGRES_DB: booksafe
+    ports:
+      - "5432:5432"
+    volumes:
+      - booksafe-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booksafe -d booksafe"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: booksafe-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  booksafe-pgdata:
+    external: true
